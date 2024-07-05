@@ -79,12 +79,15 @@ export default function App() {
 
   useEffect(
     function () {
+      const controller = new AbortController();
+
       async function fetchMovies() {
         try {
           setIsLoading(true);
           setError("");
           const response = await fetch(
-            `http://www.omdbapi.com/?apikey=${KEY}&s=${query}`
+            `http://www.omdbapi.com/?apikey=${KEY}&s=${query}`,
+            { signal: controller.signal }
           );
 
           if (!response.ok) throw new Error("Something Went Wrong!");
@@ -94,9 +97,9 @@ export default function App() {
           if (data.Response === "False") throw new Error("Movie not Found!");
 
           setMovies(data.Search);
+          setError("");
         } catch (error) {
-          console.error(error);
-          setError(error.message);
+          if (!error.name !== "AbortError") setError(error.message);
         } finally {
           setIsLoading(false);
         }
@@ -106,7 +109,12 @@ export default function App() {
         setError("");
         return;
       }
+      handleCloseMovie();
       fetchMovies();
+
+      return function () {
+        controller.abort();
+      };
     },
     [query]
   );
@@ -300,6 +308,19 @@ function MovieDetails({ selectedID, onCloseMovie, onAddWatched, watched }) {
     onCloseMovie();
   }
 
+  useEffect(function () {
+    function callback(event) {
+      if (event.code === "Escape") {
+        onCloseMovie();
+      }
+    }
+    document.addEventListener("keydown", callback);
+
+    return function () {
+      document.removeEventListener("keydown", callback);
+    };
+  });
+
   useEffect(
     function () {
       async function getMovieDetails() {
@@ -314,6 +335,18 @@ function MovieDetails({ selectedID, onCloseMovie, onAddWatched, watched }) {
       getMovieDetails();
     },
     [selectedID]
+  );
+
+  useEffect(
+    function () {
+      if (!title) return;
+      document.title = `MOVIE | ${title}`;
+
+      return function () {
+        document.title = "usePopcorn";
+      };
+    },
+    [title]
   );
 
   return (
